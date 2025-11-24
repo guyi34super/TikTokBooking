@@ -1,0 +1,838 @@
+openapi: 3.0.3
+info:
+  title: Booking Service API
+  description: |
+    Core booking service for managing reservations of products, services, appointments, and events.
+    Supports multi-tenant operations with conflict prevention and event-driven workflows.
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: api-support@example.com
+
+servers:
+  - url: https://api.example.com/booking/v1
+    description: Production
+  - url: https://api-staging.example.com/booking/v1
+    description: Staging
+  - url: http://localhost:8080/booking/v1
+    description: Local Development
+
+tags:
+  - name: bookings
+    description: Booking management operations
+  - name: availability
+    description: Availability checking and slot management
+  - name: admin
+    description: Administrative operations
+
+security:
+  - bearerAuth: []
+
+paths:
+  /bookings:
+    post:
+      tags: [bookings]
+      summary: Create a new booking
+      description: |
+        Creates a new booking reservation. The booking will be in PENDING status until payment is confirmed.
+        This endpoint validates availability and prevents double-booking using optimistic locking.
+      operationId: createBooking
+      security:
+        - bearerAuth: ['booking:write']
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingCreate'
+            examples:
+              product-booking:
+                summary: Product booking
+                value:
+                  user_id: "550e8400-e29b-41d4-a716-446655440000"
+                  product_id: "650e8400-e29b-41d4-a716-446655440001"
+                  start_time: "2025-12-01T14:00:00Z"
+                  end_time: "2025-12-01T15:00:00Z"
+                  quantity: 2
+                  metadata:
+                    notes: "Window seat preferred"
+              service-booking:
+                summary: Service appointment booking
+                value:
+                  user_id: "550e8400-e29b-41d4-a716-446655440000"
+                  product_id: "750e8400-e29b-41d4-a716-446655440002"
+                  provider_id: "850e8400-e29b-41d4-a716-446655440003"
+                  start_time: "2025-12-05T10:00:00Z"
+                  end_time: "2025-12-05T11:00:00Z"
+                  quantity: 1
+                  location:
+                    lat: 37.7749
+                    lon: -122.4194
+                    address: "123 Main St, San Francisco, CA"
+                    place_id: "ChIJIQBpAG2ahYAR_6128GcTUEo"
+      responses:
+        '201':
+          description: Booking successfully created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Booking conflict - slot not available
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: "BOOKING_CONFLICT"
+                message: "The selected time slot is no longer available"
+                details:
+                  conflicting_bookings: ["123e4567-e89b-12d3-a456-426614174000"]
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    get:
+      tags: [bookings]
+      summary: List bookings
+      description: Retrieve a paginated list of bookings with optional filters
+      operationId: listBookings
+      security:
+        - bearerAuth: ['booking:read']
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/ProviderId'
+        - $ref: '#/components/parameters/ProductId'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/BookingStatus'
+          description: Filter by booking status
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter bookings starting after this date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter bookings ending before this date
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/SortBy'
+        - $ref: '#/components/parameters/SortOrder'
+      responses:
+        '200':
+          description: List of bookings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /bookings/{id}:
+    get:
+      tags: [bookings]
+      summary: Get booking by ID
+      description: Retrieve detailed information about a specific booking
+      operationId: getBooking
+      security:
+        - bearerAuth: ['booking:read']
+      parameters:
+        - $ref: '#/components/parameters/BookingId'
+      responses:
+        '200':
+          description: Booking details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    patch:
+      tags: [bookings]
+      summary: Update booking
+      description: |
+        Modify an existing booking (reschedule, change quantity, update metadata).
+        Uses optimistic locking via version field to prevent conflicts.
+      operationId: updateBooking
+      security:
+        - bearerAuth: ['booking:write']
+      parameters:
+        - $ref: '#/components/parameters/BookingId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingUpdate'
+      responses:
+        '200':
+          description: Booking successfully updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Version conflict or booking conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    delete:
+      tags: [bookings]
+      summary: Delete booking
+      description: |
+        Soft delete a booking (admin only). Regular users should use the cancel endpoint.
+      operationId: deleteBooking
+      security:
+        - bearerAuth: ['booking:admin']
+      parameters:
+        - $ref: '#/components/parameters/BookingId'
+      responses:
+        '204':
+          description: Booking successfully deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /bookings/{id}/cancel:
+    post:
+      tags: [bookings]
+      summary: Cancel a booking
+      description: |
+        Cancel an existing booking. Applies cancellation rules and may trigger refund processing.
+      operationId: cancelBooking
+      security:
+        - bearerAuth: ['booking:write']
+      parameters:
+        - $ref: '#/components/parameters/BookingId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  maxLength: 500
+                  description: Optional cancellation reason
+                version:
+                  type: integer
+                  description: Current version for optimistic locking
+      responses:
+        '200':
+          description: Booking successfully cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Booking cannot be cancelled (e.g., already completed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /bookings/{id}/confirm:
+    post:
+      tags: [bookings]
+      summary: Confirm a booking
+      description: |
+        Move booking from PENDING to CONFIRMED status (typically called after payment success).
+      operationId: confirmBooking
+      security:
+        - bearerAuth: ['booking:confirm']
+      parameters:
+        - $ref: '#/components/parameters/BookingId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                payment_id:
+                  type: string
+                  format: uuid
+                  description: Associated payment ID
+      responses:
+        '200':
+          description: Booking confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Booking cannot be confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /availability/check:
+    post:
+      tags: [availability]
+      summary: Check availability
+      description: Check if a specific time slot is available for booking
+      operationId: checkAvailability
+      security:
+        - bearerAuth: ['booking:read']
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - product_id
+                - start_time
+              properties:
+                product_id:
+                  type: string
+                  format: uuid
+                provider_id:
+                  type: string
+                  format: uuid
+                start_time:
+                  type: string
+                  format: date-time
+                end_time:
+                  type: string
+                  format: date-time
+                quantity:
+                  type: integer
+                  default: 1
+      responses:
+        '200':
+          description: Availability result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  available:
+                    type: boolean
+                  slots:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        start_time:
+                          type: string
+                          format: date-time
+                        end_time:
+                          type: string
+                          format: date-time
+                        available_quantity:
+                          type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /admin/bookings/stats:
+    get:
+      tags: [admin]
+      summary: Get booking statistics
+      description: Retrieve aggregate statistics about bookings (admin only)
+      operationId: getBookingStats
+      security:
+        - bearerAuth: ['booking:admin']
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: group_by
+          in: query
+          schema:
+            type: string
+            enum: [day, week, month, product, provider, status]
+      responses:
+        '200':
+          description: Booking statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_bookings:
+                    type: integer
+                  total_revenue:
+                    type: number
+                    format: double
+                  by_status:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                  breakdown:
+                    type: array
+                    items:
+                      type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /health:
+    get:
+      tags: [admin]
+      summary: Health check
+      description: Service health and readiness check
+      operationId: healthCheck
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  version:
+                    type: string
+                    example: "1.0.0"
+                  timestamp:
+                    type: string
+                    format: date-time
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT access token obtained from Auth service
+
+  parameters:
+    BookingId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Booking unique identifier
+
+    UserId:
+      name: user_id
+      in: query
+      schema:
+        type: string
+        format: uuid
+      description: Filter by user ID
+
+    ProviderId:
+      name: provider_id
+      in: query
+      schema:
+        type: string
+        format: uuid
+      description: Filter by provider ID
+
+    ProductId:
+      name: product_id
+      in: query
+      schema:
+        type: string
+        format: uuid
+      description: Filter by product ID
+
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number for pagination
+
+    PageSize:
+      name: page_size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Number of items per page
+
+    SortBy:
+      name: sort_by
+      in: query
+      schema:
+        type: string
+        enum: [created_at, start_time, updated_at, price_amount]
+        default: created_at
+      description: Field to sort by
+
+    SortOrder:
+      name: sort_order
+      in: query
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: desc
+      description: Sort order
+
+  schemas:
+    BookingCreate:
+      type: object
+      required:
+        - user_id
+        - product_id
+        - start_time
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          description: ID of the user making the booking
+        product_id:
+          type: string
+          format: uuid
+          description: ID of the product/service being booked
+        provider_id:
+          type: string
+          format: uuid
+          description: Optional provider ID for service bookings
+        start_time:
+          type: string
+          format: date-time
+          description: Booking start time (ISO 8601)
+        end_time:
+          type: string
+          format: date-time
+          description: Booking end time (optional for instant/product bookings)
+        quantity:
+          type: integer
+          minimum: 1
+          default: 1
+          description: Number of items/slots to book
+        location:
+          $ref: '#/components/schemas/Location'
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Flexible metadata for booking-specific information
+          example:
+            customer_notes: "Please call upon arrival"
+            special_requests: ["wheelchair_accessible", "pet_friendly"]
+
+    BookingUpdate:
+      type: object
+      properties:
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        quantity:
+          type: integer
+          minimum: 1
+        location:
+          $ref: '#/components/schemas/Location'
+        metadata:
+          type: object
+          additionalProperties: true
+        version:
+          type: integer
+          description: Current version for optimistic locking (required)
+
+    Booking:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique booking identifier
+        user_id:
+          type: string
+          format: uuid
+        product_id:
+          type: string
+          format: uuid
+        provider_id:
+          type: string
+          format: uuid
+          nullable: true
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+          nullable: true
+        quantity:
+          type: integer
+        status:
+          $ref: '#/components/schemas/BookingStatus'
+        price_amount:
+          type: number
+          format: double
+          description: Total booking price
+        price_currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          description: ISO 4217 currency code
+          example: "USD"
+        payment_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Associated payment ID (when payment is made)
+        location_id:
+          type: string
+          format: uuid
+          nullable: true
+        location:
+          $ref: '#/components/schemas/Location'
+        metadata:
+          type: object
+          additionalProperties: true
+        version:
+          type: integer
+          description: Version for optimistic locking
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - user_id
+        - product_id
+        - start_time
+        - status
+        - price_amount
+        - price_currency
+        - version
+        - created_at
+        - updated_at
+
+    BookingStatus:
+      type: string
+      enum:
+        - PENDING
+        - CONFIRMED
+        - CANCELLED
+        - COMPLETED
+        - FAILED
+      description: |
+        * PENDING - Booking created, awaiting payment/confirmation
+        * CONFIRMED - Booking confirmed (payment successful)
+        * CANCELLED - Booking cancelled by user or system
+        * COMPLETED - Booking has been fulfilled
+        * FAILED - Booking failed (e.g., payment failed)
+
+    Location:
+      type: object
+      properties:
+        lat:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+          description: Latitude
+        lon:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+          description: Longitude
+        address:
+          type: string
+          maxLength: 500
+          description: Human-readable address
+        place_id:
+          type: string
+          description: Google Maps Place ID
+        city:
+          type: string
+        state:
+          type: string
+        country:
+          type: string
+          minLength: 2
+          maxLength: 2
+          description: ISO 3166-1 alpha-2 country code
+        postal_code:
+          type: string
+
+    BookingList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Booking'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          description: Current page number
+        page_size:
+          type: integer
+          description: Items per page
+        total_items:
+          type: integer
+          description: Total number of items
+        total_pages:
+          type: integer
+          description: Total number of pages
+
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code
+          example: "BOOKING_CONFLICT"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "The selected time slot is no longer available"
+        details:
+          type: object
+          additionalProperties: true
+          description: Additional error context
+        trace_id:
+          type: string
+          description: Request trace ID for debugging
+        timestamp:
+          type: string
+          format: date-time
+
+  responses:
+    BadRequest:
+      description: Bad request - invalid input
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: "INVALID_INPUT"
+            message: "Invalid request parameters"
+            details:
+              validation_errors:
+                - field: "start_time"
+                  message: "must be in the future"
+
+    Unauthorized:
+      description: Unauthorized - missing or invalid authentication
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: "UNAUTHORIZED"
+            message: "Authentication required"
+
+    Forbidden:
+      description: Forbidden - insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: "FORBIDDEN"
+            message: "You do not have permission to access this resource"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: "NOT_FOUND"
+            message: "Booking not found"
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: "INTERNAL_ERROR"
+            message: "An unexpected error occurred"
+            trace_id: "abc123xyz"
