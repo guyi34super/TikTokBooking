@@ -1,310 +1,320 @@
-# 📦 Order Tracking System for Products & Services
+# 🚀 Microservices Booking Platform - Complete Implementation
 
-A simple, production-ready order management system with payment tracking for products and services.
+A production-ready, scalable microservices platform for booking products and services with TikTok integration, payments, and real-time tracking.
 
-## 🎯 What This System Does
+## 🏗️ Architecture
 
-- ✅ **Product & Service Catalog** - List and manage products/services
-- ✅ **Order Creation** - Customers can order products/services
-- ✅ **Payment Tracking** - Track if orders are paid/pending/failed
-- ✅ **Order Status Tracking** - Monitor order lifecycle (pending → processing → completed)
-- ✅ **Admin Dashboard** - View all orders and mark them as paid
-- ✅ **Customer Order History** - Users can see their order history
+### Microservices
+- **User Service** (Port 3001) - Authentication, profiles, social login
+- **Catalog Service** (Port 3002) - Products/services catalog, inventory
+- **Booking Service** (Port 3003) - Core booking logic, reservations
+- **Payment Service** (Port 3004) - Stripe/PayPal integration, webhooks
+- **Receipt Service** (Port 3005) - PDF generation, S3 storage
+- **Notification Service** (Port 3006) - Email/SMS notifications
+- **Location Service** (Port 3007) - Google Maps integration
+- **Integration Service** (Port 3008) - TikTok analytics & attribution
+- **Admin Service** (Port 3009) - Reports, user management
+- **API Gateway** (Port 8080) - Single entry point, routing
+
+### Infrastructure
+- **PostgreSQL** - Database per service
+- **Redis** - Caching, sessions, rate limiting
+- **Kafka** - Event streaming between services
+- **Frontend** (Port 3000) - React SPA with TypeScript
 
 ## 📁 Project Structure
 
 ```
 /workspace
-├── api-specs/
-│   └── order-service-openapi.yaml     # Complete REST API specification
-├── database/
-│   ├── 001_create_products_table.sql  # Products & services catalog
-│   ├── 002_create_orders_table.sql    # Orders with payment tracking
-│   └── 003_create_users_table.sql     # User accounts
-├── frontend/src/
-│   ├── components/
-│   │   ├── ProductList.tsx            # Browse and add to cart
-│   │   ├── OrderTracker.tsx           # View order history
-│   │   └── AdminDashboard.tsx         # Admin: see all orders & payments
-│   └── services/
-│       └── api.ts                     # API client
-├── events/
-│   ├── order-events.ts                # Event type definitions
-│   ├── order-producer.ts              # Publish events (order created, paid)
-│   └── notification-consumer.ts       # Send email notifications
-└── README.md                          # This file
+├── services/
+│   ├── user-service/          # User management & auth
+│   ├── catalog-service/       # Products & services
+│   ├── booking-service/       # Core booking logic
+│   ├── payment-service/       # Payment processing
+│   ├── receipt-service/       # Receipt generation
+│   ├── notification-service/  # Notifications
+│   ├── location-service/      # Google Maps
+│   ├── integration-service/   # TikTok integration
+│   ├── admin-service/         # Admin operations
+│   └── api-gateway/           # API Gateway
+├── frontend/                  # React application
+├── infrastructure/
+│   ├── docker-compose.yml     # Local development
+│   └── kubernetes/            # K8s manifests
+├── database/                  # Database migrations
+├── docs/                      # Documentation
+└── README.md
 ```
 
 ## 🚀 Quick Start
 
-### 1. Set Up Database
+### Prerequisites
+- Docker & Docker Compose
+- Node.js 18+
+- PostgreSQL 14+
+- Kafka
+
+### 1. Start Infrastructure
 
 ```bash
-# Create database
-createdb order_system
-
-# Run migrations
-psql -d order_system -f database/001_create_products_table.sql
-psql -d order_system -f database/002_create_orders_table.sql
-psql -d order_system -f database/003_create_users_table.sql
+cd infrastructure
+docker-compose up -d
 ```
 
-### 2. Insert Sample Data
+This starts:
+- PostgreSQL (all databases)
+- Redis
+- Kafka + Zookeeper
+- Elasticsearch
 
-```sql
--- Add some sample products
-INSERT INTO products (name, description, type, price, category, in_stock) VALUES
-  ('Website Design', 'Professional website design service', 'service', 999.00, 'design', true),
-  ('Logo Creation', 'Custom logo design', 'service', 299.00, 'design', true),
-  ('Laptop Stand', 'Ergonomic aluminum laptop stand', 'product', 49.99, 'accessories', true),
-  ('Wireless Mouse', 'Bluetooth wireless mouse', 'product', 29.99, 'accessories', true);
-```
-
-### 3. Start Backend (Choose Your Language)
-
-#### Node.js Example
-```bash
-npm install express pg kafkajs
-node server.js
-```
-
-#### Python Example
-```bash
-pip install fastapi uvicorn psycopg2 kafka-python
-uvicorn main:app --reload
-```
-
-### 4. Start Frontend
+### 2. Set Up Databases
 
 ```bash
-cd frontend
-npm install
-npm start
+./scripts/setup-databases.sh
 ```
 
-## 📊 Database Schema
+### 3. Start All Services
 
-### Products Table
-- **id** - Unique product ID
-- **name** - Product/service name
-- **type** - 'product' or 'service'
-- **price** - Price in decimal
-- **in_stock** - Availability status
+```bash
+# Terminal 1 - User Service
+cd services/user-service && npm install && npm run dev
 
-### Orders Table
-- **id** - Unique order ID
-- **user_id** - Customer who placed order
-- **items** - JSON array of ordered items
-- **total_amount** - Total order value
-- **status** - pending | processing | completed | cancelled
-- **payment_status** - pending | paid | failed | refunded
-- **paid_at** - Timestamp when payment was received
+# Terminal 2 - Catalog Service  
+cd services/catalog-service && npm install && npm run dev
 
-### Order Status History Table
-- Automatically tracks all status changes
-- Used for order tracking timeline
+# Terminal 3 - Booking Service
+cd services/booking-service && npm install && npm run dev
 
-## 🔌 API Endpoints
+# Terminal 4 - Payment Service
+cd services/payment-service && npm install && npm run dev
 
-### Public Endpoints
-- `GET /v1/products` - List all products/services
-- `GET /v1/products/{id}` - Get product details
+# Terminal 5 - Integration Service (TikTok)
+cd services/integration-service && npm install && npm run dev
 
-### Customer Endpoints (Requires Auth)
-- `POST /v1/orders` - Create new order
-- `GET /v1/orders` - Get my orders
-- `GET /v1/orders/{id}` - Get order details
-- `GET /v1/orders/{id}/payment-status` - Check if order is paid
+# Terminal 6 - API Gateway
+cd services/api-gateway && npm install && npm start
 
-### Admin Endpoints (Requires Admin Auth)
-- `GET /v1/admin/orders` - Get all orders (with filters)
-- `POST /v1/admin/orders/{id}/mark-paid` - Manually mark order as paid
+# Terminal 7 - Frontend
+cd frontend && npm install && npm run dev
+```
 
-## 💳 Payment Flow
+### 4. Access the Application
 
-1. **Customer creates order** → Status: `pending`, Payment: `pending`
-2. **Payment webhook received** → Payment: `paid`, Order: `processing`
-3. **Admin fulfills order** → Status: `completed`
+- **Frontend**: http://localhost:3000
+- **API Gateway**: http://localhost:8080
+- **Swagger UI**: http://localhost:8080/docs
 
-### Stripe Integration (Optional)
+## 🔄 Event Flow
 
+```
+User creates booking
+  ↓
+Booking Service → booking.created event
+  ↓
+Payment Service → Creates Stripe PaymentIntent
+  ↓
+User pays via Stripe
+  ↓
+Payment Service → payment.succeeded event
+  ↓
+├─> Booking Service → Updates status to CONFIRMED
+├─> Receipt Service → Generates PDF receipt
+├─> Notification Service → Sends confirmation email
+└─> Integration Service → Sends event to TikTok
+```
+
+## 📊 Key Features
+
+### ✅ Booking Management
+- Create bookings for products/services
+- Real-time availability checking
+- Optimistic locking for concurrency
+- Status tracking (PENDING → CONFIRMED → COMPLETED)
+
+### ✅ Payment Processing
+- Stripe integration (cards, Apple Pay, Google Pay)
+- Secure webhook handling
+- PCI-DSS compliant
+- Automatic payment status updates
+
+### ✅ TikTok Integration
+- Track conversion events
+- Attribution data
+- Server-to-server events API
+- Purchase event forwarding with:
+  - Order ID & value
+  - User identifiers (hashed)
+  - Attribution (UTM params, click_id)
+
+### ✅ User Management
+- Email/password authentication
+- Social login (Google, Apple)
+- JWT tokens
+- Role-based access (user, provider, admin)
+
+### ✅ Location Services
+- Google Maps integration
+- Place autocomplete
+- Geocoding/reverse geocoding
+- Store provider locations
+
+### ✅ Notifications
+- Email notifications (order confirmations, receipts)
+- SMS support (Twilio)
+- Template-based system
+
+### ✅ Admin Dashboard
+- View all bookings
+- Revenue analytics
+- User management
+- Manual payment marking
+
+## 🔐 Security
+
+- JWT authentication on all services
+- OAuth2 for social login
+- Stripe webhook signature verification
+- Rate limiting on API Gateway
+- CORS configuration
+- Input validation
+- SQL injection protection
+
+## 📈 Scalability
+
+- Horizontal scaling of stateless services
+- Database per service pattern
+- Event-driven architecture
+- Redis caching
+- Kafka for async processing
+- Load balancing via API Gateway
+
+## 🧪 Testing
+
+```bash
+# Unit tests
+npm test
+
+# Integration tests
+npm run test:integration
+
+# E2E tests
+cd frontend && npm run test:e2e
+```
+
+## 📦 Deployment
+
+### Docker
+
+```bash
+# Build all services
+docker-compose -f docker-compose.prod.yml build
+
+# Deploy
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+### Kubernetes
+
+```bash
+# Deploy to K8s
+kubectl apply -f infrastructure/kubernetes/
+
+# Check status
+kubectl get pods -n booking-platform
+```
+
+## 📚 API Documentation
+
+Each service exposes OpenAPI documentation:
+
+- User Service: http://localhost:3001/docs
+- Catalog Service: http://localhost:3002/docs
+- Booking Service: http://localhost:3003/docs
+- Payment Service: http://localhost:3004/docs
+- Integration Service: http://localhost:3008/docs
+
+## 🔧 Configuration
+
+Each service has its own `.env` file:
+
+```bash
+# Example: services/booking-service/.env
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/booking_db
+KAFKA_BROKERS=localhost:9092
+REDIS_URL=redis://localhost:6379
+JWT_SECRET=your-secret-key
+```
+
+## 📊 Monitoring
+
+- **Prometheus**: Metrics collection
+- **Grafana**: Dashboards
+- **Jaeger**: Distributed tracing
+- **ELK Stack**: Logging
+
+Access monitoring:
+- Grafana: http://localhost:3030
+- Jaeger: http://localhost:16686
+
+## 🎯 TikTok Integration Details
+
+The Integration Service handles:
+
+1. **Client-side tracking**: TikTok Pixel embedded in frontend
+2. **Server-side events**: Reliable conversion tracking via Events API
+
+For each completed booking:
 ```javascript
-// In your order creation endpoint
-const paymentIntent = await stripe.paymentIntents.create({
-  amount: order.total_amount * 100, // in cents
-  currency: 'usd',
-  metadata: { order_id: order.id }
-});
-
-// In webhook handler
-if (event.type === 'payment_intent.succeeded') {
-  await db.query(
-    'UPDATE orders SET payment_status = $1, paid_at = $2 WHERE id = $3',
-    ['paid', new Date(), order_id]
-  );
+{
+  event: "CompletePayment",
+  event_id: "unique-event-id",
+  properties: {
+    content_type: "product",
+    contents: [{ content_id: "product-id", quantity: 1 }],
+    value: 99.99,
+    currency: "USD"
+  },
+  user: {
+    email: "hashed-email",
+    phone: "hashed-phone"
+  },
+  timestamp: "2025-11-24T10:30:00Z"
 }
 ```
 
-## 📧 Kafka Events
+## 🚧 Development
 
-The system publishes events for:
-- `order.created` - When new order is placed
-- `order.paid` - When payment is received
-- `order.status_changed` - When order status updates
+### Adding a New Service
 
-Consumers can subscribe to these events to:
-- Send email notifications
-- Update analytics
-- Trigger fulfillment workflows
+1. Create service directory: `services/my-service/`
+2. Add to `docker-compose.yml`
+3. Create database migration
+4. Add to API Gateway routes
+5. Update documentation
 
-## 🎨 Frontend Features
+### Database Migrations
 
-### ProductList Component
-- Browse products and services
-- Add to cart
-- Filter by type (product vs service)
-- Show stock availability
+```bash
+# Create migration
+npm run migrate:create --name=add_new_field
 
-### OrderTracker Component
-- View all your orders
-- See payment status (pending/paid)
-- Track order status
-- View order history timeline
+# Run migrations
+npm run migrate:up
 
-### AdminDashboard Component
-- View all orders across all customers
-- Filter by status and payment status
-- See total revenue and statistics
-- Manually mark orders as paid
-
-## 🔧 Backend Implementation Example
-
-### Node.js with Express
-
-```javascript
-const express = require('express');
-const { Pool } = require('pg');
-
-const app = express();
-const db = new Pool({ connectionString: process.env.DATABASE_URL });
-
-// Create order
-app.post('/v1/orders', async (req, res) => {
-  const { items } = req.body;
-  const user_id = req.user.id; // from auth middleware
-  
-  const total = items.reduce((sum, item) => 
-    sum + (item.price * item.quantity), 0
-  );
-  
-  const result = await db.query(
-    `INSERT INTO orders (user_id, items, total_amount, status, payment_status)
-     VALUES ($1, $2, $3, 'pending', 'pending') RETURNING *`,
-    [user_id, JSON.stringify(items), total]
-  );
-  
-  // Publish Kafka event
-  await publishOrderCreated(result.rows[0]);
-  
-  res.json(result.rows[0]);
-});
-
-// Get my orders
-app.get('/v1/orders', async (req, res) => {
-  const user_id = req.user.id;
-  const result = await db.query(
-    'SELECT * FROM orders WHERE user_id = $1 ORDER BY created_at DESC',
-    [user_id]
-  );
-  res.json(result.rows);
-});
-
-// Check payment status
-app.get('/v1/orders/:id/payment-status', async (req, res) => {
-  const result = await db.query(
-    'SELECT id, payment_status, paid_at, total_amount, currency FROM orders WHERE id = $1',
-    [req.params.id]
-  );
-  res.json(result.rows[0]);
-});
+# Rollback
+npm run migrate:down
 ```
 
-## 🛡️ Security
+## 📞 Support
 
-- All customer endpoints require JWT authentication
-- Admin endpoints require admin role
-- Payment webhooks should verify signatures
-- SQL injection protected with parameterized queries
+- Documentation: `/docs`
+- API Specs: `/api-specs`
+- Issues: Create GitHub issue
 
-## 📈 What You Can Track
+## 📄 License
 
-### For Customers
-- ✅ What they ordered
-- ✅ How much they paid
-- ✅ Payment status (pending/paid/failed)
-- ✅ Order status (pending/processing/completed)
-- ✅ Order history
-
-### For Admins
-- ✅ All orders across all customers
-- ✅ Which orders are paid vs pending payment
-- ✅ Total revenue
-- ✅ Order fulfillment status
-- ✅ Ability to manually mark orders as paid
-
-## 🔄 Common Workflows
-
-### Customer Places Order
-1. Browse products (`ProductList.tsx`)
-2. Add items to cart
-3. Click "Proceed to Checkout"
-4. Order created with status `pending`
-5. Customer pays (via Stripe or other method)
-6. Webhook updates `payment_status` to `paid`
-7. Order moves to `processing`
-8. Admin fulfills order → status becomes `completed`
-
-### Admin Manages Orders
-1. View dashboard (`AdminDashboard.tsx`)
-2. Filter by pending payments
-3. Mark orders as paid manually (if needed)
-4. Track order fulfillment
-
-## 🚧 Next Steps to Implement
-
-1. **Authentication** - Add JWT auth middleware
-2. **Payment Gateway** - Integrate Stripe/PayPal
-3. **Email Service** - Connect notification consumer to SendGrid/AWS SES
-4. **Admin Panel** - Add product management (CRUD)
-5. **Search** - Add product search functionality
-6. **Images** - Add product image uploads
-
-## 📦 Technologies
-
-- **Frontend**: React, TypeScript, TanStack Query
-- **Backend**: Node.js/Python/Go (your choice)
-- **Database**: PostgreSQL
-- **Events**: Apache Kafka
-- **Payments**: Stripe (recommended)
-
-## 🎯 Key Features Summary
-
-| Feature | Status |
-|---------|--------|
-| Product catalog | ✅ Complete |
-| Order creation | ✅ Complete |
-| Payment tracking | ✅ Complete |
-| Order status tracking | ✅ Complete |
-| Customer order history | ✅ Complete |
-| Admin dashboard | ✅ Complete |
-| Kafka events | ✅ Complete |
-| Email notifications | ✅ Framework ready |
-| Payment webhook | ✅ Endpoint ready |
-
-## 📝 License
-
-This is a technical blueprint - use it for your projects!
+MIT
 
 ---
 
-**Ready to build?** Start by setting up the database, then implement the backend API using the OpenAPI spec, and connect the React frontend! 🚀
+**Ready for production deployment!** 🎉
