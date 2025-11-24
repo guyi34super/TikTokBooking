@@ -1,25 +1,23 @@
--- Products and Services Table
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
-CREATE TYPE product_type AS ENUM ('product', 'service');
-
-CREATE TABLE products (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+-- Create products table
+CREATE TABLE IF NOT EXISTS products (
+    id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    description TEXT,
-    type product_type NOT NULL,
+    type VARCHAR(50) NOT NULL CHECK (type IN ('product', 'service')),
     price DECIMAL(10, 2) NOT NULL,
-    currency VARCHAR(3) DEFAULT 'USD',
-    category VARCHAR(100),
-    image_url TEXT,
     in_stock BOOLEAN DEFAULT true,
-    stock_quantity INTEGER,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_products_type ON products(type);
-CREATE INDEX idx_products_category ON products(category);
-CREATE INDEX idx_products_in_stock ON products(in_stock);
+-- Insert sample data
+INSERT INTO products (name, type, price, in_stock) VALUES
+    ('Web Development Service', 'service', 2500.00, true),
+    ('Mobile App Development', 'service', 5000.00, true),
+    ('Logo Design', 'service', 300.00, true),
+    ('SEO Optimization', 'service', 800.00, true),
+    ('MacBook Pro', 'product', 2499.00, true),
+    ('iPhone 15', 'product', 999.00, true),
+    ('AirPods Pro', 'product', 249.00, true),
+    ('iPad Air', 'product', 599.00, false);
 
-COMMENT ON TABLE products IS 'Products and services catalog';
+CREATE INDEX idx_products_type ON products(type);
+CREATE INDEX idx_products_in_stock ON products(in_stock);
