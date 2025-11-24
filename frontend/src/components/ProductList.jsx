@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getProducts, createBooking } from '../services/api'
 
-function ProductList() {
+function ProductList({ userType }) {
   const [cart, setCart] = useState([])
   const queryClient = useQueryClient()
 
@@ -15,17 +15,46 @@ function ProductList() {
     mutationFn: createBooking,
     onSuccess: () => {
       setCart([])
-      alert('✅ Booking created successfully!')
-      queryClient.invalidateQueries(['bookings'])
+      alert('Order created successfully!')
+      queryClient.invalidateQueries(['orders'])
+    },
+    onError: (error) => {
+      alert(error.response?.data?.error || 'Failed to create order')
     }
   })
 
   const addToCart = (product) => {
-    setCart([...cart, { product_id: product.id, quantity: 1, price: product.price }])
+    const existing = cart.find(item => item.product_id === product.id)
+    if (existing) {
+      setCart(cart.map(item => 
+        item.product_id === product.id 
+          ? { ...item, quantity: item.quantity + 1 }
+          : item
+      ))
+    } else {
+      setCart([...cart, { 
+        product_id: product.id, 
+        quantity: 1, 
+        price: product.price,
+        name: product.name
+      }])
+    }
   }
 
-  const removeFromCart = (index) => {
-    setCart(cart.filter((_, i) => i !== index))
+  const removeFromCart = (productId) => {
+    setCart(cart.filter(item => item.product_id !== productId))
+  }
+
+  const updateQuantity = (productId, quantity) => {
+    if (quantity < 1) {
+      removeFromCart(productId)
+    } else {
+      setCart(cart.map(item => 
+        item.product_id === productId 
+          ? { ...item, quantity }
+          : item
+      ))
+    }
   }
 
   const handleCheckout = () => {
@@ -36,66 +65,145 @@ function ProductList() {
     createBookingMutation.mutate({ items: cart })
   }
 
-  if (isLoading) return <div className="loading">Loading products...</div>
-  if (error) return <div className="error">Error loading products: {error.message}</div>
+  const cartTotal = cart.reduce((sum, item) => sum + (parseFloat(item.price) * item.quantity), 0)
+
+  if (isLoading) {
+    return (
+      <div className="loading">
+        <div className="spinner"></div>
+        <p>Loading products...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="alert alert-error">
+        Failed to load products: {error.message}
+      </div>
+    )
+  }
 
   return (
     <div>
-      <h2 style={{ color: 'white', marginBottom: '1rem' }}>🛒 Available Products & Services</h2>
-      
-      <div className="product-grid">
-        {products?.map(product => (
-          <div key={product.id} className="card">
-            <h3>{product.name}</h3>
-            <p style={{ color: '#6b7280', margin: '0.5rem 0' }}>
-              Type: {product.type}
-            </p>
-            <p style={{ fontSize: '1.5rem', color: '#667eea', fontWeight: 'bold' }}>
-              ${parseFloat(product.price).toFixed(2)}
-            </p>
-            <p style={{ color: product.in_stock ? '#10b981' : '#ef4444' }}>
-              {product.in_stock ? '✅ In Stock' : '❌ Out of Stock'}
-            </p>
+      <div className="page-header">
+        <h2>Products & Services</h2>
+        <p>Browse and purchase available products and services</p>
+      </div>
+
+      {cart.length > 0 && (
+        <div className="card">
+          <div className="card-header">
+            <h3 className="card-title">Shopping Cart ({cart.length} items)</h3>
+          </div>
+          
+          <div className="table-container">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Price</th>
+                  <th>Quantity</th>
+                  <th>Subtotal</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {cart.map((item) => (
+                  <tr key={item.product_id}>
+                    <td>{item.name}</td>
+                    <td>${parseFloat(item.price).toFixed(2)}</td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <button 
+                          className="btn btn-secondary"
+                          onClick={() => updateQuantity(item.product_id, item.quantity - 1)}
+                          style={{ padding: '4px 12px' }}
+                        >
+                          -
+                        </button>
+                        <span>{item.quantity}</span>
+                        <button 
+                          className="btn btn-secondary"
+                          onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
+                          style={{ padding: '4px 12px' }}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </td>
+                    <td>${(parseFloat(item.price) * item.quantity).toFixed(2)}</td>
+                    <td>
+                      <button 
+                        onClick={() => removeFromCart(item.product_id)}
+                        className="btn btn-danger"
+                        style={{ padding: '6px 12px', fontSize: '12px' }}
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
+            <div style={{ fontSize: '18px', fontWeight: '600' }}>
+              Total: ${cartTotal.toFixed(2)}
+            </div>
             <button 
               className="btn btn-primary"
-              onClick={() => addToCart(product)}
-              disabled={!product.in_stock}
-              style={{ width: '100%', marginTop: '0.5rem' }}
+              onClick={handleCheckout}
+              disabled={createBookingMutation.isPending}
             >
-              Add to Cart
+              {createBookingMutation.isPending ? 'Processing...' : 'Checkout'}
             </button>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-3">
+        {products?.map(product => (
+          <div key={product.id} className="product-card">
+            <div className="product-header">
+              <div className="product-name">{product.name}</div>
+              <div className="product-type">{product.type}</div>
+            </div>
+
+            {product.seller_name && (
+              <div style={{ fontSize: '12px', color: '#718096', marginBottom: '8px' }}>
+                Seller: {product.business_name || product.seller_name}
+                {product.rating && ` (${product.rating} stars)`}
+              </div>
+            )}
+
+            <div className="product-price">
+              ${parseFloat(product.price).toFixed(2)}
+            </div>
+
+            <div className="product-footer">
+              <span className={`badge ${product.in_stock ? 'badge-success' : 'badge-danger'}`}>
+                {product.in_stock ? 'In Stock' : 'Out of Stock'}
+              </span>
+              <button 
+                className="btn btn-primary"
+                onClick={() => addToCart(product)}
+                disabled={!product.in_stock}
+                style={{ padding: '8px 16px', fontSize: '13px' }}
+              >
+                Add to Cart
+              </button>
+            </div>
           </div>
         ))}
       </div>
 
-      {cart.length > 0 && (
-        <div className="card" style={{ marginTop: '2rem' }}>
-          <h3>🛒 Cart ({cart.length} items)</h3>
-          {cart.map((item, index) => (
-            <div key={index} style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              padding: '0.5rem 0',
-              borderBottom: '1px solid #e5e7eb'
-            }}>
-              <span>Product {item.product_id} x{item.quantity}</span>
-              <div>
-                <span style={{ marginRight: '1rem' }}>${parseFloat(item.price).toFixed(2)}</span>
-                <button onClick={() => removeFromCart(index)}>❌</button>
-              </div>
-            </div>
-          ))}
-          <div style={{ marginTop: '1rem', textAlign: 'right' }}>
-            <strong>Total: ${cart.reduce((sum, item) => sum + (parseFloat(item.price) * item.quantity), 0).toFixed(2)}</strong>
-          </div>
-          <button 
-            className="btn btn-success"
-            onClick={handleCheckout}
-            disabled={createBookingMutation.isPending}
-            style={{ width: '100%', marginTop: '1rem' }}
-          >
-            {createBookingMutation.isPending ? 'Processing...' : '🚀 Checkout'}
-          </button>
+      {products?.length === 0 && (
+        <div className="empty-state">
+          <div className="empty-state-icon">📦</div>
+          <h3>No Products Available</h3>
+          <p>Check back later for new products and services</p>
         </div>
       )}
     </div>

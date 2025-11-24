@@ -1,56 +1,71 @@
-import React, { useState } from 'react'
-import { loadStripe } from '@stripe/stripe-js'
-import { Elements } from '@stripe/react-stripe-js'
-import ProductList from './components/ProductList'
-import OrderTracker from './components/OrderTracker'
-import AdminDashboard from './components/AdminDashboard'
+import React, { useState, useEffect } from 'react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import Login from './components/Login'
+import Register from './components/Register'
+import Dashboard from './components/Dashboard'
 import './App.css'
 
-const stripePromise = loadStripe('pk_test_YOUR_STRIPE_PUBLISHABLE_KEY')
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1
+    }
+  }
+})
 
 function App() {
-  const [view, setView] = useState('products')
-  const [isAdmin, setIsAdmin] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [showRegister, setShowRegister] = useState(false)
+  const [user, setUser] = useState(null)
+
+  useEffect(() => {
+    // Check if user is logged in
+    const token = localStorage.getItem('token')
+    const userData = localStorage.getItem('user')
+    
+    if (token && userData) {
+      setIsAuthenticated(true)
+      setUser(JSON.parse(userData))
+    }
+  }, [])
+
+  const handleLoginSuccess = (userData, token) => {
+    localStorage.setItem('token', token)
+    localStorage.setItem('user', JSON.stringify(userData))
+    setUser(userData)
+    setIsAuthenticated(true)
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    setUser(null)
+    setIsAuthenticated(false)
+  }
 
   return (
-    <Elements stripe={stripePromise}>
+    <QueryClientProvider client={queryClient}>
       <div className="app">
-        <nav className="navbar">
-          <h1>🛍️ Booking Platform</h1>
-          <div className="nav-buttons">
-            <button 
-              onClick={() => setView('products')}
-              className={view === 'products' ? 'active' : ''}
-            >
-              🛒 Products
-            </button>
-            <button 
-              onClick={() => setView('orders')}
-              className={view === 'orders' ? 'active' : ''}
-            >
-              📦 My Orders
-            </button>
-            <button 
-              onClick={() => { setView('admin'); setIsAdmin(!isAdmin); }}
-              className={view === 'admin' ? 'active' : ''}
-            >
-              👨‍💼 Admin
-            </button>
+        {!isAuthenticated ? (
+          <div className="auth-container">
+            {showRegister ? (
+              <Register 
+                onSuccess={handleLoginSuccess}
+                onSwitchToLogin={() => setShowRegister(false)}
+              />
+            ) : (
+              <Login 
+                onSuccess={handleLoginSuccess}
+                onSwitchToRegister={() => setShowRegister(true)}
+              />
+            )}
           </div>
-        </nav>
-
-        <main className="main-content">
-          {view === 'products' && <ProductList />}
-          {view === 'orders' && <OrderTracker />}
-          {view === 'admin' && <AdminDashboard isAdmin={isAdmin} />}
-        </main>
-
-        <footer className="footer">
-          <p>✅ Microservices Platform | Connected to API Gateway (http://localhost:8080)</p>
-          <p>📊 TikTok Pixel Active</p>
-        </footer>
+        ) : (
+          <Dashboard user={user} onLogout={handleLogout} />
+        )}
       </div>
-    </Elements>
+    </QueryClientProvider>
   )
 }
 

@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_BASE_URL = 'http://localhost:8080'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -8,6 +8,28 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 })
+
+// Add token to all requests
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+// Handle 401 errors (expired token)
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      window.location.reload()
+    }
+    return Promise.reject(error)
+  }
+)
 
 // Products API
 export const getProducts = async () => {
@@ -20,11 +42,11 @@ export const getProduct = async (id) => {
   return response.data
 }
 
-// Bookings API
+// Orders/Bookings API
 export const createBooking = async (bookingData) => {
   const response = await api.post('/bookings', bookingData)
   
-  // Track with TikTok
+  // Track with TikTok if available
   if (window.ttq) {
     window.ttq.track('InitiateCheckout', {
       content_type: 'product',
@@ -37,19 +59,13 @@ export const createBooking = async (bookingData) => {
   return response.data
 }
 
-export const getBookings = async () => {
+export const getOrders = async () => {
   const response = await api.get('/bookings')
   return response.data
 }
 
-export const getBooking = async (id) => {
+export const getOrder = async (id) => {
   const response = await api.get(`/bookings/${id}`)
-  return response.data
-}
-
-// Payments API
-export const createPayment = async (paymentData) => {
-  const response = await api.post('/payments/create', paymentData)
   return response.data
 }
 
@@ -62,7 +78,7 @@ export const getAdminOrders = async () => {
 export const markOrderPaid = async (orderId) => {
   const response = await api.post(`/admin/orders/${orderId}/mark-paid`)
   
-  // Track with TikTok
+  // Track with TikTok if available
   if (window.ttq) {
     window.ttq.track('CompletePayment', {
       content_type: 'product',
@@ -71,6 +87,17 @@ export const markOrderPaid = async (orderId) => {
     })
   }
   
+  return response.data
+}
+
+// Sellers API
+export const getSellers = async () => {
+  const response = await api.get('/sellers')
+  return response.data
+}
+
+export const getSeller = async (id) => {
+  const response = await api.get(`/sellers/${id}`)
   return response.data
 }
 
