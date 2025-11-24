@@ -20,6 +20,7 @@ app.use(limiter);
 
 // Service URLs
 const SERVICES = {
+  user: process.env.USER_SERVICE_URL || 'http://localhost:3001',
   catalog: process.env.CATALOG_SERVICE_URL || 'http://localhost:3002',
   booking: process.env.BOOKING_SERVICE_URL || 'http://localhost:3003',
   payment: process.env.PAYMENT_SERVICE_URL || 'http://localhost:3004',
@@ -32,6 +33,29 @@ app.get('/health', (req, res) => {
 });
 
 // Proxy routes
+app.use('/auth', createProxyMiddleware({ 
+  target: SERVICES.user, 
+  pathRewrite: { '^/auth': '/auth' },
+  changeOrigin: true 
+}));
+
+app.use('/users', createProxyMiddleware({ 
+  target: SERVICES.user, 
+  changeOrigin: true 
+}));
+
+app.use('/sellers', createProxyMiddleware({ 
+  target: SERVICES.user, 
+  pathRewrite: { '^/sellers': '/sellers' },
+  changeOrigin: true 
+}));
+
+app.use('/clients', createProxyMiddleware({ 
+  target: SERVICES.user, 
+  pathRewrite: { '^/clients': '/clients' },
+  changeOrigin: true 
+}));
+
 app.use('/products', createProxyMiddleware({ 
   target: SERVICES.catalog, 
   pathRewrite: { '^/products': '/products' },
@@ -68,5 +92,14 @@ app.listen(PORT, () => {
   Object.entries(SERVICES).forEach(([name, url]) => {
     console.log(`  📍 ${name}: ${url}`);
   });
+  console.log('='.repeat(50));
+  console.log('Available routes:');
+  console.log('  🔐 /auth/* - User authentication');
+  console.log('  👥 /sellers/* - Seller management');
+  console.log('  👤 /clients/* - Client management');
+  console.log('  📦 /products/* - Product catalog');
+  console.log('  📋 /bookings/* - Order management');
+  console.log('  💳 /payments/* - Payment processing');
+  console.log('  👨‍💼 /admin/* - Admin functions');
   console.log('='.repeat(50));
 });
