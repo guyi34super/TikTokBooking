@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchMyOrders, fetchOrderDetail } from '../services/api';
 
@@ -10,7 +10,7 @@ interface Order {
     quantity: number;
     price: number;
   }>;
-  total_amount: number;
+  total_amount: string;
   currency: string;
   status: 'pending' | 'processing' | 'completed' | 'cancelled';
   payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
@@ -19,12 +19,12 @@ interface Order {
 }
 
 export const OrderTracker: React.FC = () => {
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+
   const { data: orders, isLoading } = useQuery({
     queryKey: ['myOrders'],
     queryFn: fetchMyOrders,
   });
-
-  const [selectedOrderId, setSelectedOrderId] = React.useState<string | null>(null);
 
   const { data: orderDetail } = useQuery({
     queryKey: ['orderDetail', selectedOrderId],
@@ -32,73 +32,77 @@ export const OrderTracker: React.FC = () => {
     enabled: !!selectedOrderId,
   });
 
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      processing: 'bg-blue-100 text-blue-800',
-      completed: 'bg-green-100 text-green-800',
-      cancelled: 'bg-red-100 text-red-800',
-      paid: 'bg-green-100 text-green-800',
-      failed: 'bg-red-100 text-red-800',
-      refunded: 'bg-gray-100 text-gray-800',
+  const getStatusBadge = (status: string) => {
+    const classes: Record<string, string> = {
+      pending: 'badge-pending',
+      processing: 'badge-processing',
+      completed: 'badge-completed',
+      paid: 'badge-paid',
+      failed: 'badge-failed',
     };
-    return colors[status] || 'bg-gray-100 text-gray-800';
+    return classes[status] || '';
   };
 
   if (isLoading) {
-    return <div className="text-center py-8">Loading your orders...</div>;
+    return <div className="loading">Loading your orders...</div>;
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">My Orders</h1>
+    <div className="container">
+      <h1 style={{ marginBottom: '2rem' }}>My Orders</h1>
 
-      {orders?.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded">
-          <p className="text-gray-500">You haven't placed any orders yet</p>
+      {!orders || orders.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
+          <p style={{ fontSize: '3rem', margin: '0 0 1rem 0' }}>📦</p>
+          <p style={{ color: '#666', fontSize: '1.1rem' }}>You haven't placed any orders yet</p>
+          <p style={{ color: '#999', marginTop: '0.5rem' }}>
+            Go to Products tab to start shopping!
+          </p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {orders?.map((order: Order) => (
-            <div key={order.id} className="border rounded-lg p-4 hover:shadow-lg transition-shadow">
-              <div className="flex justify-between items-start mb-3">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {orders.map((order: Order) => (
+            <div key={order.id} className="card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
                 <div>
-                  <h3 className="font-bold text-lg">Order #{order.id.substring(0, 8)}</h3>
-                  <p className="text-sm text-gray-500">
-                    {new Date(order.created_at).toLocaleDateString()}
+                  <h3 style={{ margin: '0 0 0.5rem 0' }}>
+                    Order #{order.id.substring(0, 8)}
+                  </h3>
+                  <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
+                    📅 {new Date(order.created_at).toLocaleString()}
                   </p>
                 </div>
-                <div className="text-right">
-                  <span className={`px-3 py-1 rounded text-sm ${getStatusColor(order.status)}`}>
-                    {order.status}
+                <div style={{ textAlign: 'right' }}>
+                  <span className={`badge ${getStatusBadge(order.status)}`}>
+                    {order.status.toUpperCase()}
                   </span>
                   <br />
-                  <span className={`px-3 py-1 rounded text-sm mt-2 inline-block ${getStatusColor(order.payment_status)}`}>
-                    Payment: {order.payment_status}
+                  <span className={`badge ${getStatusBadge(order.payment_status)}`} style={{ marginTop: '0.5rem' }}>
+                    💳 {order.payment_status.toUpperCase()}
                   </span>
                 </div>
               </div>
 
               {/* Items */}
-              <div className="mb-3">
-                <p className="font-semibold mb-2">Items:</p>
-                <ul className="space-y-1">
+              <div style={{ marginBottom: '1rem', padding: '1rem', background: '#f9f9f9', borderRadius: '8px' }}>
+                <strong style={{ display: 'block', marginBottom: '0.5rem' }}>Items:</strong>
+                <ul style={{ margin: 0, paddingLeft: '1.5rem' }}>
                   {order.items.map((item, idx) => (
-                    <li key={idx} className="text-sm">
-                      {item.product_name} × {item.quantity} - ${item.price * item.quantity}
+                    <li key={idx} style={{ marginBottom: '0.25rem' }}>
+                      {item.product_name} × {item.quantity} - ${(item.price * item.quantity).toFixed(2)}
                     </li>
                   ))}
                 </ul>
               </div>
 
               {/* Total */}
-              <div className="border-t pt-3 flex justify-between items-center">
-                <p className="font-bold text-lg">
-                  Total: ${order.total_amount} {order.currency}
-                </p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '1rem', borderTop: '2px solid #e0e0e0' }}>
+                <strong style={{ fontSize: '1.2rem' }}>
+                  Total: ${parseFloat(order.total_amount).toFixed(2)}
+                </strong>
                 <button
                   onClick={() => setSelectedOrderId(order.id)}
-                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                  className="btn btn-primary"
                 >
                   View Details
                 </button>
@@ -106,7 +110,7 @@ export const OrderTracker: React.FC = () => {
 
               {/* Payment Status */}
               {order.payment_status === 'paid' && order.paid_at && (
-                <div className="mt-2 text-sm text-green-600">
+                <div style={{ marginTop: '0.5rem', padding: '0.5rem', background: '#d4edda', borderRadius: '4px', color: '#155724', fontSize: '0.9rem' }}>
                   ✓ Paid on {new Date(order.paid_at).toLocaleString()}
                 </div>
               )}
@@ -117,20 +121,48 @@ export const OrderTracker: React.FC = () => {
 
       {/* Order Detail Modal */}
       {selectedOrderId && orderDetail && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-96 overflow-y-auto">
-            <h2 className="text-2xl font-bold mb-4">Order Details</h2>
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '2rem',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            padding: '2rem',
+            maxWidth: '600px',
+            width: '100%',
+            maxHeight: '80vh',
+            overflow: 'auto'
+          }}>
+            <h2 style={{ marginTop: 0 }}>Order Details</h2>
             
+            <div style={{ marginBottom: '1rem' }}>
+              <strong>Order ID:</strong> {orderDetail.id}
+            </div>
+
             {/* Status History */}
-            {orderDetail.tracking_info?.status_history && (
-              <div className="mb-4">
-                <h3 className="font-semibold mb-2">Status History:</h3>
-                <div className="space-y-2">
+            {orderDetail.tracking_info?.status_history && orderDetail.tracking_info.status_history.length > 0 && (
+              <div style={{ marginBottom: '1.5rem' }}>
+                <strong style={{ display: 'block', marginBottom: '0.5rem' }}>Status History:</strong>
+                <div style={{ borderLeft: '3px solid #667eea', paddingLeft: '1rem' }}>
                   {orderDetail.tracking_info.status_history.map((entry: any, idx: number) => (
-                    <div key={idx} className="text-sm border-l-2 border-blue-500 pl-3">
-                      <p className="font-semibold">{entry.status}</p>
-                      <p className="text-gray-500">{new Date(entry.timestamp).toLocaleString()}</p>
-                      {entry.note && <p className="text-gray-600">{entry.note}</p>}
+                    <div key={idx} style={{ marginBottom: '1rem' }}>
+                      <div style={{ fontWeight: 'bold', color: '#667eea' }}>{entry.status}</div>
+                      <div style={{ fontSize: '0.85rem', color: '#666' }}>
+                        {new Date(entry.timestamp).toLocaleString()}
+                      </div>
+                      {entry.note && (
+                        <div style={{ fontSize: '0.9rem', marginTop: '0.25rem' }}>{entry.note}</div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -139,7 +171,8 @@ export const OrderTracker: React.FC = () => {
 
             <button
               onClick={() => setSelectedOrderId(null)}
-              className="mt-4 bg-gray-300 px-4 py-2 rounded hover:bg-gray-400"
+              className="btn"
+              style={{ background: '#e0e0e0', width: '100%' }}
             >
               Close
             </button>

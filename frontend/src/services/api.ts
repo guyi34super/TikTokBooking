@@ -1,17 +1,26 @@
 import axios from 'axios';
 
+const API_BASE_URL = 'http://localhost:8080/v1';
+
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8080/v1',
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Add auth token to requests
+// Add auth token to requests (for demo, we'll use a simple flag)
+let isAdminMode = false;
+
+export const setAdminMode = (admin: boolean) => {
+  isAdminMode = admin;
+};
+
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('auth_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  if (isAdminMode) {
+    config.headers.Authorization = 'Bearer admin-token';
+  } else {
+    config.headers.Authorization = 'Bearer user-token';
   }
   return config;
 });
@@ -28,8 +37,8 @@ export const fetchProductDetail = async (id: string) => {
 };
 
 // Orders
-export const createOrder = async (items: Array<{ product_id: string; quantity: number }>) => {
-  const response = await api.post('/orders', { items });
+export const createOrder = async (items: Array<{ product_id: string; quantity: number }>, notes?: string) => {
+  const response = await api.post('/orders', { items, notes });
   return response.data;
 };
 
