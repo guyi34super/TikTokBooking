@@ -1,0 +1,12 @@
+VERSION: 2.0-AUTO-START
+UPDATED: 2025-12-04
+FEATURES: Auto-starts all services and frontend
+FILE: START_EVERYTHING.sh
+
+To verify you have the latest version, check if START_EVERYTHING.sh contains:
+- "Starting all services..." message (line 77)
+- Auto-start code for each service
+- PID tracking
+- Log file creation
+
+If your local copy doesn't have these features, you need to sync/pull from the remote workspace.
