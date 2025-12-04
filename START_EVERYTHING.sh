@@ -42,6 +42,7 @@ echo "🗄️  Creating database and tables..."
 docker exec -i postgres psql -U postgres -d order_system < ../database/001_create_products_table.sql 2>/dev/null
 docker exec -i postgres psql -U postgres -d order_system < ../database/002_create_orders_table.sql 2>/dev/null
 docker exec -i postgres psql -U postgres -d order_system < ../database/003_create_users_table.sql 2>/dev/null
+docker exec -i postgres psql -U postgres -d order_system < ../database/004_create_users_and_auth.sql 2>/dev/null
 echo "✅ Database setup complete"
 echo ""
 
@@ -51,7 +52,7 @@ cd ..
 echo "📦 Installing dependencies for all services..."
 echo ""
 
-services=("api-gateway" "catalog-service" "booking-service" "payment-service" "integration-service")
+services=("user-service" "api-gateway" "catalog-service" "booking-service" "payment-service" "integration-service")
 
 for service in "${services[@]}"; do
     echo "  Installing $service..."
@@ -77,6 +78,15 @@ echo "=============================================="
 echo "🚀 Starting all services..."
 echo "=============================================="
 echo ""
+
+# Start User Service FIRST (required for authentication)
+echo "  Starting User Service..."
+cd services/user-service
+nohup npm start > ../../logs/user-service.log 2>&1 &
+USER_PID=$!
+echo $USER_PID > ../../logs/user-service.pid
+cd ../..
+sleep 2
 
 # Start API Gateway
 echo "  Starting API Gateway..."

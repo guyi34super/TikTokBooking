@@ -34,6 +34,7 @@ stop_service() {
 echo "Stopping services..."
 echo ""
 
+stop_service "user-service"
 stop_service "api-gateway"
 stop_service "catalog-service"
 stop_service "booking-service"
