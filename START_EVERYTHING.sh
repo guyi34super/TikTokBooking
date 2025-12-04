@@ -13,10 +13,23 @@ fi
 echo "✅ Docker is running"
 echo ""
 
+# Create logs directory
+mkdir -p logs
+
 # Start infrastructure
 echo "📦 Starting infrastructure (PostgreSQL, Redis, Kafka)..."
 cd infrastructure
-docker-compose up -d
+
+# Try docker compose (newer) first, then docker-compose (older)
+if command -v docker &> /dev/null && docker compose version &> /dev/null 2>&1; then
+    docker compose up -d
+elif command -v docker-compose &> /dev/null; then
+    docker-compose up -d
+else
+    echo "❌ Neither 'docker compose' nor 'docker-compose' command found"
+    exit 1
+fi
+
 echo "✅ Infrastructure started"
 echo ""
 
@@ -59,29 +72,80 @@ cd ..
 echo "✅ Frontend dependencies installed"
 echo ""
 
+# Start all services in background
 echo "=============================================="
-echo "🎉 SETUP COMPLETE!"
+echo "🚀 Starting all services..."
 echo "=============================================="
 echo ""
-echo "Now start all services with these commands:"
+
+# Start API Gateway
+echo "  Starting API Gateway..."
+cd services/api-gateway
+nohup npm start > ../../logs/api-gateway.log 2>&1 &
+API_GATEWAY_PID=$!
+echo $API_GATEWAY_PID > ../../logs/api-gateway.pid
+cd ../..
+sleep 2
+
+# Start Catalog Service
+echo "  Starting Catalog Service..."
+cd services/catalog-service
+nohup npm start > ../../logs/catalog-service.log 2>&1 &
+CATALOG_PID=$!
+echo $CATALOG_PID > ../../logs/catalog-service.pid
+cd ../..
+sleep 2
+
+# Start Booking Service
+echo "  Starting Booking Service..."
+cd services/booking-service
+nohup npm start > ../../logs/booking-service.log 2>&1 &
+BOOKING_PID=$!
+echo $BOOKING_PID > ../../logs/booking-service.pid
+cd ../..
+sleep 2
+
+# Start Payment Service
+echo "  Starting Payment Service..."
+cd services/payment-service
+nohup npm start > ../../logs/payment-service.log 2>&1 &
+PAYMENT_PID=$!
+echo $PAYMENT_PID > ../../logs/payment-service.pid
+cd ../..
+sleep 2
+
+# Start Integration Service
+echo "  Starting Integration Service..."
+cd services/integration-service
+nohup npm start > ../../logs/integration-service.log 2>&1 &
+INTEGRATION_PID=$!
+echo $INTEGRATION_PID > ../../logs/integration-service.pid
+cd ../..
+sleep 2
+
+# Start Frontend
+echo "  Starting Frontend..."
+cd frontend
+nohup npm run dev > ../logs/frontend.log 2>&1 &
+FRONTEND_PID=$!
+echo $FRONTEND_PID > ../logs/frontend.pid
+cd ..
+
 echo ""
-echo "Terminal 1 - API Gateway:"
-echo "  cd services/api-gateway && npm start"
+echo "✅ All services started!"
 echo ""
-echo "Terminal 2 - Catalog Service:"
-echo "  cd services/catalog-service && npm start"
+
+# Wait a bit for services to initialize
+echo "⏳ Waiting for services to initialize..."
+sleep 5
+
 echo ""
-echo "Terminal 3 - Booking Service:"
-echo "  cd services/booking-service && npm start"
+echo "=============================================="
+echo "🎉 ALL SERVICES ARE RUNNING!"
+echo "=============================================="
 echo ""
-echo "Terminal 4 - Payment Service:"
-echo "  cd services/payment-service && npm start"
-echo ""
-echo "Terminal 5 - Integration Service (TikTok):"
-echo "  cd services/integration-service && npm start"
-echo ""
-echo "Terminal 6 - Frontend:"
-echo "  cd frontend && npm run dev"
+echo "Process IDs saved in logs/*.pid files"
+echo "Logs available in logs/*.log files"
 echo ""
 echo "=============================================="
 echo "URLs:"
@@ -89,4 +153,17 @@ echo "  🌐 Frontend:     http://localhost:3000"
 echo "  🚪 API Gateway:  http://localhost:8080"
 echo "  📦 Products:     http://localhost:8080/products"
 echo "  📋 Bookings:     http://localhost:8080/bookings"
+echo "=============================================="
+echo ""
+echo "To view logs in real-time:"
+echo "  tail -f logs/api-gateway.log"
+echo "  tail -f logs/catalog-service.log"
+echo "  tail -f logs/booking-service.log"
+echo "  tail -f logs/payment-service.log"
+echo "  tail -f logs/integration-service.log"
+echo "  tail -f logs/frontend.log"
+echo ""
+echo "To stop all services:"
+echo "  ./STOP_EVERYTHING.sh"
+echo ""
 echo "=============================================="
